@@ -1,0 +1,136 @@
+dp divider( in x	:	ns(8);
+			in y	:	ns(8);
+			in start:	ns(1);
+			out q	:	ns(10);
+			out r 	:	ns(8);
+			out done:	ns(1)) {
+			
+			
+	reg M, A, preA	: 	ns(9);
+	reg Q			: 	ns(8);
+	reg n			:	ns(8);
+	reg startReg	:	ns(1);
+	
+	
+	sfg always{
+		startReg = start;
+	}
+	
+	sfg waiting{
+		$display("State = waiting");
+		$display("cycle=", $cycle);
+	}
+	
+	sfg init { 
+		Q = x;
+		M = y;
+		A = 0; #! This Line Can Be Removed Because Initial Value Of Register Is 0
+		n = 8; #! Number Of Input Bits
+		preA = 0; #! This Line Can Be Removed Because Initial Value Of Register Is 0
+		$display("State = Initializing");
+		$display("cycle=", $cycle);
+		$display("M=", M, " A=", A, " Q=", Q, " n=", n, " preA=", preA, " done=", done, " q=", q, " r=", r);
+	}
+	
+	sfg shiftLeftAQ{
+		A = (A << 1) | (Q[7]);
+		Q = Q << 1;
+		$display("State = Shift A and Q, 1 Bit To Left");
+		$display("cycle=", $cycle);
+		$display("M=", M, " A=", A, " Q=", Q, " n=", n, " preA=", preA, " done=", done, " q=", q, " r=", r);
+	}
+	
+	sfg subAndStoreA{
+		A = A - M;
+		preA = A;
+		$display("State = Calculating A - M And Storing A Value");
+		$display("cycle=", $cycle);
+		$display("M=", M, " A=", A, " Q=", Q, " n=", n, " preA=", preA, " done=", done, " q=", q, " r=", r);
+	}
+	
+	sfg decN{
+		n = n - 1;
+	}
+	
+	sfg setQ_NegA{
+		Q = Q; #! Q Value Doesn't Change
+		A = preA; #! A Changes To Pre Value (Which Is Stored In preA)
+		$display("State = Reset A Pre Value And Q Doesn't Change");
+		$display("cycle=", $cycle);
+		$display("M=", M, " A=", A, " Q=", Q, " n=", n, " preA=", preA, " done=", done, " q=", q, " r=", r);
+	}
+	
+	sfg SetQ2{
+		Q = Q | 1; #! Q's Least Significant Bit Changes To 1
+		A = A; #! A Value Doesn't Change
+		$display("State = Q[0] Changes To 1 And A Is Not Restored");
+		$display("cycle=", $cycle);
+		$display("M=", M, " A=", A, " Q=", Q, " n=", n, " preA=", preA, " done=", done, " q=", q, " r=", r);
+	}
+	
+	sfg setOutZero{
+		q = 0;
+		r = 0;
+		done = 0;
+	}
+	
+	sfg complete{
+		q = Q;
+		r = A;
+		done = 1;
+		$display("State = Complete");
+		$display("cycle=", $cycle);
+		#! $display("M=", M, " A=", A, " Q=", Q, " n=", n, " preA=", preA, " done=", done, " q=", q, " r=", r);
+		$display("done=", done, " q=", q, " r=", r);
+	}
+}
+
+fsm div_ctl(divider) {
+	initial s0;
+	state s1, s2, s3, s4, s5;
+	
+	
+	@s0 if (startReg) then (init, setOutZero) -> s1;
+		else (waiting, setOutZero) -> s0;
+		
+	@s1 (shiftLeftAQ, setOutZero) -> s2;
+	
+	@s2 (subAndStoreA, decN, setOutZero) -> s3;
+	
+	@s3 if ((A[8]) & (n != 0)) then (setQ_NegA, setOutZero) -> s1;
+		else if ((~A[8]) & (n != 0)) then (SetQ2, setOutZero) -> s1;
+		else if ((A[8]) & (n == 0)) then (setQ_NegA, setOutZero) -> s4;
+		else (SetQ2, setOutZero) -> s4;
+		
+	@s4 (complete) -> s5;
+	
+	@s5 (setOutZero) -> s5;
+}
+
+
+dp TB(out x,y	 : ns(8);
+	  out start  : ns(1)) {
+	  reg i : ns(10);
+	  
+	sfg s1 {
+		i = i + 1;
+		start = i < 3 ? 0 : 1;
+		x = 237;
+		y = 43;
+	}
+}
+
+hardwired TB_ctl(TB) {s1; }
+
+dp sys_div {
+	sig x, y, r 	:	ns(8);
+	sig q 			:	ns(10);
+	sig start, done	:	ns(1);
+	
+	use divider(x, y, start, q, r, done);
+	use TB(x, y, start);
+}
+
+system S {
+	sys_div;
+}
