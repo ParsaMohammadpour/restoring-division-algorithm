@@ -1,4 +1,4 @@
-# co-design assignment
+# co-design restoring algorithm for division
 &nbsp; Implementing restoring division algorithm for unsigned integer with GEZEL hardware language. Here is this algorithm flowchart:<br />
 <br />
 <br />
